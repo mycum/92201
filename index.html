@@ -1,0 +1,1277 @@
+<!DOCTYPE html>
+<html lang="ru" class="scroll-smooth">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Рабочий проект дома эконом-класса «White Box»</title>
+    
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Montserrat:wght@500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Подключаем Three.js для 3D визуализации -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                        heading: ['Montserrat', 'sans-serif'],
+                    },
+                    colors: {
+                        brand: {
+                            50: '#f0f9ff',
+                            100: '#e0f2fe',
+                            500: '#0ea5e9',
+                            600: '#0284c7',
+                            900: '#0c4a6e',
+                        },
+                        blueprint: '#1e3a8a'
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            background-color: #f8fafc;
+        }
+        .glass-panel {
+            background: rgba(255, 255, 255, 0.9);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.05);
+        }
+        .blueprint-bg {
+            background-color: #1e3a8a;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                linear-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+            background-size: 100px 100px, 100px 100px, 20px 20px, 20px 20px;
+            background-position: -2px -2px, -2px -2px, -1px -1px, -1px -1px;
+        }
+        
+        /* Custom scrollbar for table */
+        .table-container::-webkit-scrollbar {
+            height: 8px;
+        }
+        .table-container::-webkit-scrollbar-track {
+            background: #f1f1f1; 
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb {
+            background: #cbd5e1; 
+            border-radius: 4px;
+        }
+        .table-container::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8; 
+        }
+
+        .tab-content {
+            display: none;
+            animation: fadeIn 0.4s ease-in-out;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        canvas {
+            image-rendering: -moz-crisp-edges;
+            image-rendering: -webkit-crisp-edges;
+            image-rendering: pixelated;
+            image-rendering: crisp-edges;
+        }
+        #webgl-container canvas {
+            display: block;
+            image-rendering: auto;
+            touch-action: none;
+        }
+        .house-view-button {
+            border: 1px solid #cbd5e1;
+            border-radius: 0.75rem;
+            padding: 0.7rem 1rem;
+            background: #fff;
+            color: #475569;
+            font-weight: 600;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .house-view-button[aria-pressed="true"] {
+            background: #0284c7;
+            border-color: #0284c7;
+            color: #fff;
+        }
+        .house-view-button:hover:not(:disabled) { border-color: #0284c7; }
+        .house-view-button:focus-visible { outline: 3px solid #7dd3fc; outline-offset: 3px; }
+        .house-view-button:disabled { opacity: 0.5; cursor: wait; }
+    </style>
+</head>
+<body class="text-slate-800 antialiased selection:bg-brand-500 selection:text-white relative">
+
+    <nav class="fixed w-full z-50 glass-panel border-b border-slate-200">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16 items-center">
+                <div class="flex-shrink-0 flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-lg bg-brand-600 flex items-center justify-center text-white shadow-lg">
+                        <i class="fa-solid fa-house-chimney"></i>
+                    </div>
+                    <span class="font-heading font-bold text-xl text-slate-900 tracking-tight hidden sm:block">Проект «White Box»</span>
+                </div>
+                <div class="flex space-x-1 sm:space-x-4 overflow-x-auto no-scrollbar py-2">
+                    <button onclick="switchTab('arch')" id="btn-arch" class="tab-btn px-3 py-2 rounded-md text-sm font-medium transition-all text-brand-600 bg-brand-50 whitespace-nowrap">Архитектура</button>
+                    <button onclick="switchTab('3d')" id="btn-3d" class="tab-btn px-3 py-2 rounded-md text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap"><i class="fa-solid fa-cube mr-1"></i> 3D Модель</button>
+                    <button onclick="switchTab('const')" id="btn-const" class="tab-btn px-3 py-2 rounded-md text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap">Конструктив</button>
+                    <button onclick="switchTab('eng')" id="btn-eng" class="tab-btn px-3 py-2 rounded-md text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap">Инженерия</button>
+                    <button onclick="switchTab('tech')" id="btn-tech" class="tab-btn px-3 py-2 rounded-md text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap"><i class="fa-solid fa-helmet-safety mr-1"></i> ППР (Стройка)</button>
+                    <button onclick="switchTab('estimate')" id="btn-estimate" class="tab-btn px-3 py-2 rounded-md text-sm font-medium text-slate-500 hover:text-slate-700 hover:bg-slate-50 transition-all whitespace-nowrap">Экономика</button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <header class="blueprint-bg text-white pt-32 pb-20 relative overflow-hidden">
+        <div class="absolute inset-0 bg-gradient-to-t from-brand-900/90 to-transparent"></div>
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10 text-center">
+            <span class="inline-block py-1 px-3 rounded-full bg-brand-500/20 border border-brand-400/30 text-brand-100 text-sm font-semibold mb-4 backdrop-blur-sm">
+                Конкурсный проект • Серийная застройка • Новосибирск
+            </span>
+            <h1 class="font-heading text-4xl md:text-5xl lg:text-6xl font-extrabold mb-6 drop-shadow-lg">
+                Малосемейный дом<br class="hidden md:block" /> эконом-класса «White Box»
+            </h1>
+            <p class="mt-4 text-xl md:text-2xl text-blue-100 max-w-3xl mx-auto font-light">
+                Капитальная альтернатива городской квартире. Идеальный баланс эргономики, энергоэффективности и девелоперской рентабельности.
+            </p>
+        </div>
+    </header>
+
+    <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12 -mt-10 relative z-20">
+        
+        <!-- TAB 1: Архитектура (АР) -->
+        <div id="tab-arch" class="tab-content active">
+            <!-- TEP Cards -->
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-10">
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+                    <i class="fa-solid fa-ruler-combined text-2xl text-brand-500 mb-3"></i>
+                    <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Габариты</div>
+                    <div class="font-heading text-lg font-bold text-slate-800">6.25 × 11.25 м</div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+                    <i class="fa-solid fa-border-all text-2xl text-brand-500 mb-3"></i>
+                    <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Застройка</div>
+                    <div class="font-heading text-lg font-bold text-slate-800">70.31 м²</div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+                    <i class="fa-solid fa-vector-square text-2xl text-brand-500 mb-3"></i>
+                    <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Полезная площадь</div>
+                    <div class="font-heading text-lg font-bold text-slate-800">54.5 м²</div>
+                </div>
+                <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-100 flex flex-col justify-center items-center text-center hover:shadow-md transition-shadow">
+                    <i class="fa-solid fa-arrows-up-to-line text-2xl text-brand-500 mb-3"></i>
+                    <div class="text-xs text-slate-500 uppercase tracking-wide font-semibold">Высота потолков</div>
+                    <div class="font-heading text-lg font-bold text-slate-800">2.80 м</div>
+                </div>
+            </div>
+
+            <!-- Floor Plan Canvas Section -->
+            <div class="bg-white rounded-3xl p-6 lg:p-10 shadow-lg border border-slate-100 mb-10">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+                    <div>
+                        <h2 class="font-heading text-2xl font-bold text-slate-800 mb-2">Генеральный план этажа (2D CAD)</h2>
+                        <p class="text-slate-500">Автоматически сгенерированный параметрический чертеж на основе ТЗ.</p>
+                    </div>
+                    <button onclick="downloadPlan()" class="bg-slate-900 hover:bg-slate-800 text-white px-5 py-2.5 rounded-lg text-sm font-medium transition-colors shadow-md flex items-center gap-2">
+                        <i class="fa-solid fa-download"></i> Сохранить схему
+                    </button>
+                </div>
+                
+                <div class="w-full overflow-hidden bg-slate-50 rounded-xl border border-slate-200 relative group flex justify-center items-center p-4 min-h-[400px]">
+                    <div class="absolute inset-0 blueprint-bg opacity-10 pointer-events-none rounded-xl"></div>
+                    <!-- Canvas Element for drawing -->
+                    <canvas id="floorPlanCanvas" class="max-w-full h-auto drop-shadow-xl z-10" width="1125" height="625"></canvas>
+                </div>
+                
+                <div class="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-list-ul text-brand-500"></i> Экспликация помещений</h3>
+                        <ul class="space-y-3">
+                            <li class="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span class="text-slate-600">1. Тамбур-прихожая (ниша 600 мм)</span>
+                                <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded">4.00 м²</span>
+                            </li>
+                            <li class="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span class="text-slate-600">2. Теплогенераторная / Техпомещение</span>
+                                <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded">3.20 м²</span>
+                            </li>
+                            <li class="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span class="text-slate-600">3. Совмещенный санузел</span>
+                                <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded">4.30 м²</span>
+                            </li>
+                            <li class="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span class="text-slate-600">4. Объединенная кухня-гостиная</span>
+                                <span class="font-semibold text-slate-800 bg-brand-50 text-brand-700 px-2 py-1 rounded">19.30 м²</span>
+                            </li>
+                            <li class="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span class="text-slate-600">5. Мастер-спальня</span>
+                                <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded">11.50 м²</span>
+                            </li>
+                            <li class="flex justify-between items-center py-2 border-b border-slate-100">
+                                <span class="text-slate-600">6. Вторая спальня / Детская</span>
+                                <span class="font-semibold text-slate-800 bg-slate-100 px-2 py-1 rounded">9.20 м²</span>
+                            </li>
+                        </ul>
+                    </div>
+                    <div>
+                        <h3 class="font-bold text-slate-800 mb-4 flex items-center gap-2"><i class="fa-solid fa-info-circle text-brand-500"></i> Градостроительные нормативы</h3>
+                        <div class="bg-brand-50/50 rounded-xl p-5 border border-brand-100 text-sm text-slate-700 space-y-4">
+                            <p><strong>Участок 4–5 соток:</strong> Оптимальный выбор. Позволяет выдержать санитарный разрыв 20–50 м между скважиной и септиком, а также противопожарные требования (отступ от соседей не менее 3 м).</p>
+                            <p><strong>Тепловой контур:</strong> Строгий прямоугольник без эркеров для минимизации теплопотерь. Габариты 6.25 × 11.25 м кратны модулю блока СИБИТ (625 мм).</p>
+                            <p><strong>Высотные отметки:</strong></p>
+                            <ul class="list-disc pl-5 space-y-1">
+                                <li><strong>0.000</strong>: Уровень чистого пола (верх стяжки)</li>
+                                <li><strong>+2.800</strong>: Чистовой натяжной потолок</li>
+                                <li><strong>+3.000</strong>: Верх ЖБ армопояса стен</li>
+                                <li><strong>+4.500</strong>: Конек кровли (уклон 22°)</li>
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 2: Конструктивные решения (КР) -->
+        <div id="tab-const" class="tab-content">
+            <div class="mb-10">
+                <h2 class="font-heading text-3xl font-bold text-slate-800 mb-6 text-center">Конструктивные решения</h2>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+                    
+                    <!-- Фундамент -->
+                    <div class="bg-white rounded-2xl shadow-md overflow-hidden border border-slate-100 flex flex-col hover:shadow-lg transition-shadow">
+                        <div class="h-3 bg-gradient-to-r from-stone-500 to-stone-400"></div>
+                        <div class="p-6 flex-1">
+                            <div class="w-12 h-12 bg-stone-100 rounded-full flex items-center justify-center text-stone-600 mb-4 text-xl">
+                                <i class="fa-solid fa-layer-group"></i>
+                            </div>
+                            <h3 class="font-bold text-xl mb-3 text-slate-800">Нулевой цикл и фундамент</h3>
+                            <ul class="space-y-3 text-sm text-slate-600">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Тип:</strong> Утепленная монолитная плита 200 мм (УШП).</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Защита от пучения:</strong> Экран из XPS Пеноплэкс 100 мм отсекает мороз и сохраняет геотермальное тепло.</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-green-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Армирование:</strong> Две сетки А500С Ø12 мм с ячейкой 200×200 мм (1.51 тонны стали).</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Стены -->
+                    <div class="bg-white rounded-2xl shadow-md overflow-hidden border border-slate-100 flex flex-col hover:shadow-lg transition-shadow">
+                        <div class="h-3 bg-gradient-to-r from-brand-500 to-brand-400"></div>
+                        <div class="p-6 flex-1">
+                            <div class="w-12 h-12 bg-brand-50 rounded-full flex items-center justify-center text-brand-600 mb-4 text-xl">
+                                <i class="fa-solid fa-cubes"></i>
+                            </div>
+                            <h3 class="font-bold text-xl mb-3 text-slate-800">Стеновые конструкции</h3>
+                            <ul class="space-y-3 text-sm text-slate-600">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-brand-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Теплофизика:</strong> Газобетон СИБИТ D400 (400 мм). Сопротивление теплопередаче <strong>R = 3.63</strong> (при норме 3.6). Без утеплителя!</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-brand-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Прочность:</strong> Класс B2.5. 1 погонный метр стены выдерживает нагрузку до <strong>40 тонн</strong>.</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-brand-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Монтаж:</strong> Полиуретановая клей-пена (шов 1-2 мм) ликвидирует мостики холода.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Кровля -->
+                    <div class="bg-white rounded-2xl shadow-md overflow-hidden border border-slate-100 flex flex-col hover:shadow-lg transition-shadow">
+                        <div class="h-3 bg-gradient-to-r from-amber-500 to-amber-400"></div>
+                        <div class="p-6 flex-1">
+                            <div class="w-12 h-12 bg-amber-50 rounded-full flex items-center justify-center text-amber-600 mb-4 text-xl">
+                                <i class="fa-solid fa-house"></i>
+                            </div>
+                            <h3 class="font-bold text-xl mb-3 text-slate-800">Кровля и перекрытие</h3>
+                            <ul class="space-y-3 text-sm text-slate-600">
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Нагрузки:</strong> Уклон 22°. Расчет на снеговую нагрузку III района Новосибирска (180 кг/м²).</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Стропила:</strong> Доска 50×200 мм (шаг 600 мм). Мауэрлат 150×150 мм на хим. анкерах.</span>
+                                </li>
+                                <li class="flex items-start gap-2">
+                                    <i class="fa-solid fa-check text-amber-500 mt-1 flex-shrink-0"></i>
+                                    <span><strong>Изоляция:</strong> Базальтовая вата 35 кг/м³ (200 мм) + пароизоляция 200 мкм.</span>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 3: Инженерные сети и отделка -->
+        <div id="tab-eng" class="tab-content">
+            <div class="bg-white rounded-3xl p-8 shadow-lg border border-slate-100 mb-10">
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-12">
+                    
+                    <div>
+                        <h3 class="font-heading text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded bg-blue-100 text-blue-600 flex items-center justify-center"><i class="fa-solid fa-pipe-valve"></i></div>
+                            Инженерные сети
+                        </h3>
+                        
+                        <div class="space-y-6">
+                            <div class="border-l-4 border-red-400 pl-4">
+                                <h4 class="font-bold text-slate-800 text-lg flex items-center justify-between">Отопление <span class="text-xs bg-red-100 text-red-700 px-2 py-1 rounded-full uppercase tracking-wider">Экономия 40%</span></h4>
+                                <p class="text-slate-600 mt-1 text-sm">Котел ZOTA Lux-X 9 кВт. Водяной теплый пол (PEX-a Ø16 мм). <strong>Инновация:</strong> бетонная стяжка массой >30 тонн работает как тепловой аккумулятор. Котел греет по дешевому ночному тарифу (2.58 ₽), а днем отдает тепло.</p>
+                            </div>
+                            
+                            <div class="border-l-4 border-blue-400 pl-4">
+                                <h4 class="font-bold text-slate-800 text-lg">Водоснабжение и Канализация</h4>
+                                <p class="text-slate-600 mt-1 text-sm">Ввод ПНД Ø32 мм на глубине 2.5м с греющим кабелем. Двухкамерный септик из ЖБ колец КС 15-9 (объем 4.5 м³) с тройным запасом для семьи из 3 человек.</p>
+                            </div>
+
+                            <div class="border-l-4 border-yellow-400 pl-4">
+                                <h4 class="font-bold text-slate-800 text-lg">Электрика и Вентиляция</h4>
+                                <p class="text-slate-600 mt-1 text-sm">Скрытая проводка ВВГнг-LS, ВРУ с УЗО и реле напряжения. Приточные клапаны КИВ-125 (35–50 м³/ч), вытяжные стояки Vilpe на кровлю.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h3 class="font-heading text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                            <div class="w-10 h-10 rounded bg-slate-100 text-slate-600 flex items-center justify-center"><i class="fa-solid fa-paint-roller"></i></div>
+                            Отделка "White Box"
+                        </h3>
+                        
+                        <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200">
+                            <ul class="space-y-4">
+                                <li class="flex gap-4">
+                                    <div class="mt-1 bg-white shadow-sm w-8 h-8 rounded flex items-center justify-center text-slate-400"><i class="fa-solid fa-building"></i></div>
+                                    <div>
+                                        <h5 class="font-bold text-slate-800">Дышащий Фасад</h5>
+                                        <p class="text-sm text-slate-600 mt-1">Цементно-перлитовая штукатурка Ceresit CT 24 по стеклосетке 160 г/м². Финиш — декоративная штукатурка «Короед».</p>
+                                    </div>
+                                </li>
+                                <li class="flex gap-4">
+                                    <div class="mt-1 bg-white shadow-sm w-8 h-8 rounded flex items-center justify-center text-slate-400"><i class="fa-solid fa-layer-group"></i></div>
+                                    <div>
+                                        <h5 class="font-bold text-slate-800">Внутренние поверхности</h5>
+                                        <p class="text-sm text-slate-600 mt-1">Стены: гипсовая машинная штукатурка «Волма Слой». Пол: полусухая стяжка 70 мм с фиброволокном под финиш.</p>
+                                    </div>
+                                </li>
+                                <li class="flex gap-4">
+                                    <div class="mt-1 bg-white shadow-sm w-8 h-8 rounded flex items-center justify-center text-slate-400"><i class="fa-solid fa-door-open"></i></div>
+                                    <div>
+                                        <h5 class="font-bold text-slate-800">Окна и Двери</h5>
+                                        <p class="text-sm text-slate-600 mt-1">ПВХ профиль 70 мм с энергосберегающими стеклопакетами. Входная металлическая дверь с терморазрывом.</p>
+                                    </div>
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 4: Смета -->
+        <div id="tab-estimate" class="tab-content">
+            <div class="bg-white rounded-3xl p-6 lg:p-8 shadow-lg border border-slate-100">
+                <div class="text-center mb-8">
+                    <h2 class="font-heading text-3xl font-bold text-slate-800 mb-2">Спецификация и сметная стоимость</h2>
+                    <p class="text-slate-500 max-w-2xl mx-auto">Стоимость строительных материалов (цены Новосибирска, 2026 год). СМР, спецтехника и коммуникации участка не учтены.</p>
+                </div>
+                
+                <div class="table-container w-full overflow-x-auto rounded-xl border border-slate-200">
+                    <table class="w-full text-left border-collapse whitespace-nowrap min-w-[800px]">
+                        <thead>
+                            <tr class="bg-slate-100 text-slate-600 text-xs uppercase tracking-wider">
+                                <th class="p-4 font-semibold rounded-tl-xl">Раздел / Наименование материала</th>
+                                <th class="p-4 font-semibold">Технические параметры</th>
+                                <th class="p-4 font-semibold">Объем</th>
+                                <th class="p-4 font-semibold text-right">Цена за ед. (₽)</th>
+                                <th class="p-4 font-semibold text-right rounded-tr-xl">Стоимость (₽)</th>
+                            </tr>
+                        </thead>
+                        <tbody class="text-sm text-slate-700 divide-y divide-slate-100">
+                            
+                            <!-- Раздел 1 -->
+                            <tr class="bg-brand-50/50"><td colspan="5" class="p-3 font-bold text-brand-700">Земляные работы и фундамент</td></tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Песок строительный и щебень 20-40 мм</td>
+                                <td class="p-4 text-slate-500">Устройство подушки (300 мм)</td>
+                                <td class="p-4">25,0 м³</td>
+                                <td class="p-4 text-right">1 000</td>
+                                <td class="p-4 text-right font-medium text-slate-900">25 000</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Утеплитель XPS Пеноплэкс Фундамент</td>
+                                <td class="p-4 text-slate-500">Листы 100 мм под плиту</td>
+                                <td class="p-4">8,0 м³</td>
+                                <td class="p-4 text-right">11 300</td>
+                                <td class="p-4 text-right font-medium text-slate-900">90 400</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Бетон товарный В22.5 (М300) П4 F150</td>
+                                <td class="p-4 text-slate-500">Плита толщиной 200 мм</td>
+                                <td class="p-4">15,0 м³</td>
+                                <td class="p-4 text-right">6 900</td>
+                                <td class="p-4 text-right font-medium text-slate-900">103 500</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Арматура рифленая А500С Ø12 мм</td>
+                                <td class="p-4 text-slate-500">Две сетки 200х200 мм</td>
+                                <td class="p-4">1,51 тонны</td>
+                                <td class="p-4 text-right">65 000</td>
+                                <td class="p-4 text-right font-medium text-slate-900">98 150</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Профилированная мембрана Planter</td>
+                                <td class="p-4 text-slate-500">Отсечка влаги</td>
+                                <td class="p-4">85,0 м²</td>
+                                <td class="p-4 text-right">180</td>
+                                <td class="p-4 text-right font-medium text-slate-900">15 300</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Расходные материалы для каркаса</td>
+                                <td class="p-4 text-slate-500">Вязальная проволока, стульчики</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">8 500</td>
+                                <td class="p-4 text-right font-medium text-slate-900">8 500</td>
+                            </tr>
+
+                            <!-- Раздел 2 -->
+                            <tr class="bg-brand-50/50"><td colspan="5" class="p-3 font-bold text-brand-700">Тепловой контур: Стены</td></tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Блок стеновой СИБИТ D400 B2.5</td>
+                                <td class="p-4 text-slate-500">Стены 400 мм</td>
+                                <td class="p-4">35,0 м³</td>
+                                <td class="p-4 text-right">8 500</td>
+                                <td class="p-4 text-right font-medium text-slate-900">297 500</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Блок перегородочный СИБИТ D500</td>
+                                <td class="p-4 text-slate-500">Стены 200 мм и 100 мм</td>
+                                <td class="p-4">10,0 м³</td>
+                                <td class="p-4 text-right">8 290</td>
+                                <td class="p-4 text-right font-medium text-slate-900">82 900</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">U-блоки СИБИТ лотковые 400 мм</td>
+                                <td class="p-4 text-slate-500">Перемычки и армопояс</td>
+                                <td class="p-4">44 пог. м</td>
+                                <td class="p-4 text-right">650</td>
+                                <td class="p-4 text-right font-medium text-slate-900">45 760</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Клей-пена полиуретановая</td>
+                                <td class="p-4 text-slate-500">Баллоны 850 мл</td>
+                                <td class="p-4">42 баллона</td>
+                                <td class="p-4 text-right">650</td>
+                                <td class="p-4 text-right font-medium text-slate-900">27 300</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Арматура стальная А500С Ø8 мм</td>
+                                <td class="p-4 text-slate-500">Армирование рядов</td>
+                                <td class="p-4">0,15 тонны</td>
+                                <td class="p-4 text-right">67 500</td>
+                                <td class="p-4 text-right font-medium text-slate-900">10 125</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Бетон В20 + Крепеж</td>
+                                <td class="p-4 text-slate-500">Армопояс, химанкеры</td>
+                                <td class="p-4">1,5 м³</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">25 500</td>
+                            </tr>
+
+                            <!-- Раздел 3 -->
+                            <tr class="bg-brand-50/50"><td colspan="5" class="p-3 font-bold text-brand-700">Кровельная система</td></tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Пиломатериалы (сосна 1-2 сорт)</td>
+                                <td class="p-4 text-slate-500">Доска 50х200, 50х150, 25х100</td>
+                                <td class="p-4">8,5 м³</td>
+                                <td class="p-4 text-right">19 500</td>
+                                <td class="p-4 text-right font-medium text-slate-900">165 750</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Металлочерепица СуперМонтеррей 0.45</td>
+                                <td class="p-4 text-slate-500">Полиэстер RAL 7024</td>
+                                <td class="p-4">115,0 м²</td>
+                                <td class="p-4 text-right">600</td>
+                                <td class="p-4 text-right font-medium text-slate-900">69 000</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Утеплитель базальтовый 35 кг/м³</td>
+                                <td class="p-4 text-slate-500">Слой 200 мм</td>
+                                <td class="p-4">15,5 м³</td>
+                                <td class="p-4 text-right">4 000</td>
+                                <td class="p-4 text-right font-medium text-slate-900">62 000</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Пленки и доборные элементы</td>
+                                <td class="p-4 text-slate-500">Паро/ветрозащита, планки</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">49 000</td>
+                            </tr>
+
+                            <!-- Раздел 4 -->
+                            <tr class="bg-brand-50/50"><td colspan="5" class="p-3 font-bold text-brand-700">Фасад и Интерьер (White Box)</td></tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Окна ПВХ и дверь с терморазрывом</td>
+                                <td class="p-4 text-slate-500">5 окон + 1 дверь</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">145 000</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Штукатурка базовая Ceresit CT 24</td>
+                                <td class="p-4 text-slate-500">Мешки 25 кг</td>
+                                <td class="p-4">35 мешков</td>
+                                <td class="p-4 text-right">1 130</td>
+                                <td class="p-4 text-right font-medium text-slate-900">39 550</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Декоративная штукатурка CT 174</td>
+                                <td class="p-4 text-slate-500">"Короед" + стеклосетка</td>
+                                <td class="p-4">15 ведер</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">83 500</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Штукатурка гипсовая "Волма Слой"</td>
+                                <td class="p-4 text-slate-500">Мешки 30 кг</td>
+                                <td class="p-4">110 мешков</td>
+                                <td class="p-4 text-right">655</td>
+                                <td class="p-4 text-right font-medium text-slate-900">72 050</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Полусухая стяжка пола</td>
+                                <td class="p-4 text-slate-500">Пескобетон, фиброволокно</td>
+                                <td class="p-4">4,5 м³</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">24 000</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Утепленная отмостка</td>
+                                <td class="p-4 text-slate-500">XPS 50 мм + Бетон В15 + Сетка</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">32 000</td>
+                            </tr>
+
+                            <!-- Раздел 5 -->
+                            <tr class="bg-brand-50/50"><td colspan="5" class="p-3 font-bold text-brand-700">Инженерные сети</td></tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Котел ZOTA Lux-X 9 кВт (380 В)</td>
+                                <td class="p-4 text-slate-500">Настенный</td>
+                                <td class="p-4">1 шт</td>
+                                <td class="p-4 text-right">49 100</td>
+                                <td class="p-4 text-right font-medium text-slate-900">49 100</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Труба теплого пола PEX-a Ø16 мм</td>
+                                <td class="p-4 text-slate-500">С антидиффузионным слоем</td>
+                                <td class="p-4">460 пог. м</td>
+                                <td class="p-4 text-right">83</td>
+                                <td class="p-4 text-right font-medium text-slate-900">38 180</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Коллекторный шкаф ШРВ-2 + Коллектор</td>
+                                <td class="p-4 text-slate-500">На 5 контуров</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">18 500</td>
+                                <td class="p-4 text-right font-medium text-slate-900">18 500</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Кабели ВВГнг-LS + ВРУ (Щит)</td>
+                                <td class="p-4 text-slate-500">Скрытая проводка</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">63 500</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Септик ЖБИ (КС 15-9)</td>
+                                <td class="p-4 text-slate-500">Двухкамерный</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">35 000</td>
+                                <td class="p-4 text-right font-medium text-slate-900">35 000</td>
+                            </tr>
+                            <tr class="hover:bg-slate-50 transition-colors">
+                                <td class="p-4">Трубы ХВС/ГВС, канализация, КИВ-125</td>
+                                <td class="p-4 text-slate-500">Внутренние сети</td>
+                                <td class="p-4">1 компл</td>
+                                <td class="p-4 text-right">—</td>
+                                <td class="p-4 text-right font-medium text-slate-900">36 500</td>
+                            </tr>
+
+                            <!-- Итоготовая строка -->
+                            <tr class="bg-slate-900 text-white shadow-inner">
+                                <td colspan="4" class="p-5 font-bold text-lg text-right border-b border-slate-800">ИТОГО МАТЕРИАЛЫ:</td>
+                                <td class="p-5 font-heading font-bold text-2xl text-right text-brand-400 border-b border-slate-800">1 812 565 ₽</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+                <!-- Developer Economics Section -->
+                <div class="mt-10 bg-slate-50 rounded-2xl p-6 lg:p-8 border border-brand-100 relative overflow-hidden">
+                    <div class="absolute top-0 right-0 p-10 opacity-5 pointer-events-none text-9xl text-brand-500"><i class="fa-solid fa-chart-pie"></i></div>
+                    <div class="relative z-10">
+                        <h3 class="font-heading text-2xl font-bold text-slate-800 mb-6 flex items-center gap-3">
+                            Девелоперская бизнес-модель
+                            <span class="bg-green-100 text-green-700 text-xs px-3 py-1 rounded-full uppercase tracking-wider">Высокая маржинальность</span>
+                        </h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <div class="text-xs text-slate-500 mb-1">Фонд оплаты труда (СМР)</div>
+                                <div class="font-bold text-xl text-slate-700">~ 1 100 000 ₽</div>
+                            </div>
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <div class="text-xs text-slate-500 mb-1">Земельный участок (4 сотки)</div>
+                                <div class="font-bold text-xl text-slate-700">~ 800 000 ₽</div>
+                            </div>
+                            <div class="bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
+                                <div class="text-xs text-slate-500 mb-1">Коммуникации (Скважина + РЭС)</div>
+                                <div class="font-bold text-xl text-slate-700">~ 180 000 ₽</div>
+                            </div>
+                            <div class="bg-brand-600 p-5 rounded-xl shadow-md text-white">
+                                <div class="text-xs text-brand-100 mb-1">Полная себестоимость</div>
+                                <div class="font-bold text-2xl">~ 3 890 000 ₽</div>
+                            </div>
+                        </div>
+
+                        <div class="bg-green-50 border border-green-200 rounded-xl p-6 flex flex-col md:flex-row justify-between items-center gap-4">
+                            <div>
+                                <h4 class="font-bold text-green-800 text-lg">Рыночная стоимость объекта</h4>
+                                <p class="text-green-700 text-sm">Подходит под лимиты льготной «Семейной ипотеки» (до 6 млн. ₽).</p>
+                            </div>
+                            <div class="text-right">
+                                <div class="font-heading text-3xl font-extrabold text-green-700">~ 5 500 000 ₽</div>
+                                <div class="text-green-600 font-medium">Чистая прибыль: ~ 1 600 000 ₽ (Рентабельность >30%)</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- TAB 5: 3D Модель -->
+        <div id="tab-3d" class="tab-content">
+            <div class="bg-white rounded-3xl p-6 lg:p-8 shadow-lg border border-slate-100 mb-10">
+                <div class="text-center mb-6">
+                    <h2 class="font-heading text-3xl font-bold text-slate-800 mb-2">Интерактивная 3D-модель (White Box)</h2>
+                    <p class="text-slate-500">Вращайте модель мышью (или пальцем на телефоне), используйте колесико для масштабирования.</p>
+                </div>
+                <div class="flex flex-wrap items-center gap-3 mb-4" role="group" aria-label="Режим просмотра дома">
+                    <button type="button" id="house-exterior" class="house-view-button" aria-pressed="true" aria-controls="webgl-container" disabled><i class="fa-solid fa-house mr-2" aria-hidden="true"></i>Внешний вид</button>
+                    <button type="button" id="house-interior" class="house-view-button" aria-pressed="false" aria-controls="webgl-container" disabled><i class="fa-solid fa-layer-group mr-2" aria-hidden="true"></i>Планировка без крыши</button>
+                    <button type="button" id="house-top" class="house-view-button" aria-pressed="false" aria-controls="webgl-container" disabled><i class="fa-solid fa-border-all mr-2" aria-hidden="true"></i>Вид сверху</button>
+                </div>
+                <p id="house-view-status" class="text-sm text-slate-500 mb-4" role="status" aria-live="polite">Внешний вид: крыша и стены показаны полностью.</p>
+                
+                <div class="w-full bg-slate-50 rounded-2xl overflow-hidden border border-slate-200 relative h-[500px] md:h-[600px] shadow-inner" id="webgl-container">
+                    <!-- Three.js Canvas will be injected here -->
+                    <div id="3d-loader" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-50 z-10 transition-opacity duration-500">
+                        <i class="fa-solid fa-circle-notch fa-spin text-4xl text-brand-500 mb-4"></i>
+                        <span class="text-slate-600 font-medium">Генерация BIM-модели...</span>
+                    </div>
+                </div>
+                
+                <div class="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
+                        <i class="fa-solid fa-maximize text-brand-500 mt-1"></i>
+                        <div><strong class="block text-slate-800">Габариты</strong> <span class="text-slate-600">6.25 × 11.25 м, высота стен 3.0 м.</span></div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
+                        <i class="fa-solid fa-layer-group text-brand-500 mt-1"></i>
+                        <div><strong class="block text-slate-800">Кровля</strong> <span class="text-slate-600">Двускатная 22°, свесы по 600 мм.</span></div>
+                    </div>
+                    <div class="bg-slate-50 p-4 rounded-xl border border-slate-100 flex items-start gap-3">
+                        <i class="fa-solid fa-sun text-brand-500 mt-1"></i>
+                        <div><strong class="block text-slate-800">Освещенность</strong> <span class="text-slate-600">Панорамное окно 1.8х1.4м в гостиной.</span></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- TAB 6: Технология (ППР) -->
+        <div id="tab-tech" class="tab-content">
+            <div class="bg-white rounded-3xl p-6 lg:p-10 shadow-lg border border-slate-100">
+                <div class="mb-10">
+                    <h2 class="font-heading text-3xl font-bold text-slate-800 mb-4 flex items-center gap-3">
+                        Технологическая карта производства работ (ППР)
+                        <span class="bg-amber-100 text-amber-700 text-xs px-3 py-1 rounded-full uppercase tracking-wider hidden sm:inline-block">Для прораба</span>
+                    </h2>
+                    <p class="text-slate-600 text-lg">Пошаговый регламент возведения дома. Строгое соблюдение технологии — залог гарантии и отсутствия рекламаций.</p>
+                </div>
+
+                <!-- Timeline -->
+                <div class="relative border-l-4 border-brand-200 ml-4 md:ml-8 space-y-12 pb-8">
+                    
+                    <!-- Шаг 1 -->
+                    <div class="relative pl-8 md:pl-12">
+                        <div class="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-brand-500 border-4 border-white shadow-sm"></div>
+                        <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-xl text-slate-800">1. Нулевой цикл и подготовка основания</h3>
+                                <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">Дни 1-3</span>
+                            </div>
+                            <ul class="list-disc pl-5 space-y-2 text-slate-700 text-sm">
+                                <li><strong>Разметка и выемка:</strong> Снятие плодородного слоя (300-400 мм). Формирование котлована 7.5 × 12.5 м.</li>
+                                <li><strong>Дренаж и подушка:</strong> Укладка геотекстиля 250 г/м². Засыпка щебня (фракция 20-40, слой 100 мм), затем песка (200 мм) с послойным трамбованием виброплитой до плотности 1.6 т/м³.</li>
+                                <li><strong>Коммуникации:</strong> Закладка гильз ПНД Ø110 под ввод воды (кабель 16 Вт/м), электрики и вывод канализации.</li>
+                                <li class="text-brand-700 bg-brand-50 p-2 rounded mt-2"><i class="fa-solid fa-triangle-exclamation mr-1"></i> <strong>Критический контроль:</strong> Перепад высот по песчаной подушке не должен превышать ±10 мм.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 2 -->
+                    <div class="relative pl-8 md:pl-12">
+                        <div class="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-blue-500 border-4 border-white shadow-sm"></div>
+                        <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-xl text-slate-800">2. Утепленная плита и теплый пол</h3>
+                                <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">Дни 4-8</span>
+                            </div>
+                            <ul class="list-disc pl-5 space-y-2 text-slate-700 text-sm">
+                                <li><strong>Теплоизоляция:</strong> Сплошной настил XPS Пеноплэкс Фундамент (100 мм) + мембрана Planter Standard.</li>
+                                <li><strong>Армирование:</strong> Вязка двух сеток (А500С Ø12, ячейка 200х200). Защитный слой бетона — 35 мм снизу, 30 мм сверху.</li>
+                                <li><strong>Отопление:</strong> Раскладка трубы PEX-a Ø16 мм на верхнюю сетку (шаг 150 мм, 5 контуров), опрессовка воздухом (3-4 атм) перед заливкой.</li>
+                                <li><strong>Бетонирование:</strong> Приемка бетона В22.5 (М300) П4 с использованием глубинного вибратора. Толщина плиты строго 200 мм.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 3 -->
+                    <div class="relative pl-8 md:pl-12">
+                        <div class="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-slate-600 border-4 border-white shadow-sm"></div>
+                        <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-xl text-slate-800">3. Возведение теплового контура (Кладка)</h3>
+                                <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">Дни 15-25</span>
+                            </div>
+                            <ul class="list-disc pl-5 space-y-2 text-slate-700 text-sm">
+                                <li><strong>Первый ряд:</strong> Кладка на цементно-песчаный раствор по гидроизоляции для идеального выравнивания.</li>
+                                <li><strong>Основная кладка:</strong> СИБИТ D400 400 мм на полиуретановую клей-пену (шов 1-2 мм). Перевязка блоков не менее 150 мм.</li>
+                                <li><strong>Армирование кладки:</strong> Штробление 1-го, 4-го, 8-го рядов и под окнами. Укладка 2хØ8 мм арматуры.</li>
+                                <li><strong>Перемычки и Армопояс:</strong> Монтаж U-блоков с термовкладышем XPS 50 мм, каркасом 4Ø12 и бетоном В20.</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 4 -->
+                    <div class="relative pl-8 md:pl-12">
+                        <div class="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-amber-500 border-4 border-white shadow-sm"></div>
+                        <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-xl text-slate-800">4. Кровельная система</h3>
+                                <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">Дни 26-35</span>
+                            </div>
+                            <ul class="list-disc pl-5 space-y-2 text-slate-700 text-sm">
+                                <li><strong>Деревянный каркас:</strong> Монтаж мауэрлата 150х150. Установка стропил 50х200 с шагом 600 мм (угол 22°). Огнебиозащита.</li>
+                                <li><strong>Пирог кровли:</strong> Гидро-ветрозащита, контробрешетка 50х50, шаговая обрешетка 25х100, металлочерепица 0.45 мм.</li>
+                                <li><strong>Перекрытие:</strong> Укладка пароизоляции с проклейкой швов скотчем Delta. Утепление базальтовой ватой (200 мм с перехлестом).</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Шаг 5 -->
+                    <div class="relative pl-8 md:pl-12">
+                        <div class="absolute -left-[14px] top-0 w-6 h-6 rounded-full bg-green-500 border-4 border-white shadow-sm"></div>
+                        <div class="bg-slate-50 rounded-2xl p-6 border border-slate-200 hover:shadow-md transition-shadow">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="font-bold text-xl text-slate-800">5. Окна, фасад и отделка (White Box)</h3>
+                                <span class="text-xs font-bold text-slate-500 bg-white px-2 py-1 rounded border border-slate-200">Дни 36-50</span>
+                            </div>
+                            <ul class="list-disc pl-5 space-y-2 text-slate-700 text-sm">
+                                <li><strong>Окна:</strong> Монтаж ПВХ окон 70 мм по ГОСТу с ПСУЛ и гидроизоляционными лентами.</li>
+                                <li><strong>Фасад:</strong> Штукатурка Ceresit CT 24 по стеклосетке 160 г/м². Финиш — силиконовый «Короед».</li>
+                                <li><strong>Интерьер:</strong> Машинная штукатурка стен «Волма Слой». Полусухая стяжка пола (70 мм) затертая «вертолетами».</li>
+                            </ul>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script>
+        let is3DInitialized = false;
+        let is3DInitializing = false;
+        const housePlan = {
+            width: 1125, depth: 625, margin: 10, outerWall: 40,
+            partition: 10, leftBlockW: 260, rightBlockW: 320,
+            bearingWall: 20, bathroomEnd: 200, utilityEnd: 350, bedroomEnd: 280
+        };
+
+        function switchTab(tabId) {
+            // Hide all tabs
+            document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('active'));
+            
+            // Reset buttons
+            const allBtnIds = ['arch', 'const', 'eng', 'estimate', '3d', 'tech'];
+            allBtnIds.forEach(id => {
+                const el = document.getElementById('btn-' + id);
+                if(el) {
+                    el.classList.remove('text-brand-600', 'bg-brand-50');
+                    el.classList.add('text-slate-500', 'hover:text-slate-700', 'hover:bg-slate-50');
+                }
+            });
+
+            // Show selected tab
+            document.getElementById('tab-' + tabId).classList.add('active');
+            
+            // Highlight selected button
+            const activeBtn = document.getElementById('btn-' + tabId);
+            activeBtn.classList.remove('text-slate-500', 'hover:text-slate-700', 'hover:bg-slate-50');
+            activeBtn.classList.add('text-brand-600', 'bg-brand-50');
+
+            // Handle specific initializations
+            if (tabId === 'arch') {
+                drawFloorPlan();
+            } else if (tabId === '3d') {
+                if (!is3DInitialized && !is3DInitializing) {
+                    is3DInitializing = true;
+                    setTimeout(() => {
+                        try {
+                            init3DHouse();
+                            is3DInitialized = true;
+                        } catch (error) {
+                            const loader = document.getElementById('3d-loader');
+                            loader.style.opacity = '1';
+                            loader.style.display = 'flex';
+                            loader.querySelector('i').className = 'fa-solid fa-circle-exclamation text-4xl text-brand-500 mb-4';
+                            loader.querySelector('span').textContent = 'Не удалось открыть 3D-модель. Проверьте доступность WebGL и обновите страницу.';
+                            loader.setAttribute('role', 'alert');
+                        } finally {
+                            is3DInitializing = false;
+                        }
+                    }, 100);
+                }
+            }
+        }
+
+        function init3DHouse() {
+            const container = document.getElementById('webgl-container');
+            const loader = document.getElementById('3d-loader');
+            
+            // Scene Setup
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xf8fafc);
+            
+            // Camera Setup
+            const camera = new THREE.PerspectiveCamera(45, container.clientWidth / container.clientHeight, 0.1, 100);
+            camera.position.set(15, 10, 20);
+
+            // Renderer Setup
+            const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
+            renderer.outputEncoding = THREE.sRGBEncoding;
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.setSize(container.clientWidth, container.clientHeight);
+            renderer.domElement.setAttribute('role', 'img');
+            renderer.domElement.setAttribute('aria-label', 'Интерактивная 3D-модель дома');
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+            container.appendChild(renderer.domElement);
+
+            // Controls
+            const controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05;
+            controls.target.set(0, 1.5, 0);
+
+            // Lighting
+            const ambientLight = new THREE.HemisphereLight(0xffffff, 0x444444, 0.6);
+            scene.add(ambientLight);
+
+            const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            dirLight.position.set(10, 20, 10);
+            dirLight.castShadow = true;
+            dirLight.shadow.mapSize.width = 2048;
+            dirLight.shadow.mapSize.height = 2048;
+            scene.add(dirLight);
+
+            // Group for the entire house
+            const houseGroup = new THREE.Group();
+
+            // Materials
+            const plasterMat = new THREE.MeshStandardMaterial({ color: 0xf1f5f9, roughness: 0.9 });
+            const foundationMat = new THREE.MeshStandardMaterial({ color: 0x94a3b8, roughness: 0.7 });
+            const roofMat = new THREE.MeshStandardMaterial({ color: 0x334155, roughness: 0.8, flatShading: true });
+            const glassMat = new THREE.MeshStandardMaterial({ color: 0xbae6fd, metalness: 0.8, roughness: 0.2 });
+            const frameMat = new THREE.MeshStandardMaterial({ color: 0x1e293b });
+            const doorMat = new THREE.MeshStandardMaterial({ color: 0x8b5a2b, roughness: 0.9 });
+
+            // 1. Foundation
+            const w = 6.25;
+            const l = 11.25;
+            const h = 3.0;
+            
+            const foundationGeo = new THREE.BoxGeometry(w + 0.2, 0.4, l + 0.2);
+            const foundation = new THREE.Mesh(foundationGeo, foundationMat);
+            foundation.position.y = 0.2;
+            foundation.castShadow = true;
+            foundation.receiveShadow = true;
+            houseGroup.add(foundation);
+
+            const wallGroup = new THREE.Group();
+            wallGroup.position.y = 0.4;
+            houseGroup.add(wallGroup);
+            const openingGroup = new THREE.Group();
+            houseGroup.add(openingGroup);
+            const labelGroup = new THREE.Group();
+            labelGroup.visible = false;
+            houseGroup.add(labelGroup);
+
+            const plan = housePlan;
+            const inX = plan.margin + plan.outerWall;
+            const inY = inX;
+            const inW = plan.width - inX * 2;
+            const inH = plan.depth - inY * 2;
+            const leftWallX = inX + plan.leftBlockW;
+            const rightRoomX = inX + inW - plan.rightBlockW;
+            const rightWallX = rightRoomX - plan.bearingWall;
+            const scaleX = w / (plan.depth - plan.margin * 2);
+            const scaleZ = l / (plan.width - plan.margin * 2);
+
+            function addPlanBox(group, px, py, width, depth, bottom, height, material) {
+                const mesh = new THREE.Mesh(new THREE.BoxGeometry(depth * scaleX, height, width * scaleZ), material);
+                mesh.position.set((py + depth / 2 - plan.depth / 2) * scaleX, bottom + height / 2, (px + width / 2 - plan.width / 2) * scaleZ);
+                mesh.castShadow = true;
+                mesh.receiveShadow = true;
+                group.add(mesh);
+                return mesh;
+            }
+
+            function addPlanWall(px, py, width, depth, openings = [], facade = false) {
+                const horizontal = width > depth;
+                const length = horizontal ? width : depth;
+                function addSegment(start, span, bottom, height, material = plasterMat, group = wallGroup) {
+                    if (span <= 0 || height <= 0) return;
+                    return addPlanBox(group, px + (horizontal ? start : 0), py + (horizontal ? 0 : start), horizontal ? span : width, horizontal ? depth : span, bottom, height, material);
+                }
+                let cursor = 0;
+                openings.sort((first, second) => first.start - second.start).forEach(opening => {
+                    addSegment(cursor, opening.start - cursor, 0, h);
+                    addSegment(opening.start, opening.span, 0, opening.bottom);
+                    addSegment(opening.start, opening.span, opening.bottom + opening.height, h - opening.bottom - opening.height);
+                    if (facade) {
+                        const openingX = px + (horizontal ? opening.start : width / 2 - 2);
+                        const openingY = py + (horizontal ? depth / 2 - 2 : opening.start);
+                        const openingW = horizontal ? opening.span : 4;
+                        const openingD = horizontal ? 4 : opening.span;
+                        addPlanBox(openingGroup, openingX, openingY, openingW, openingD, 0.4 + opening.bottom, opening.height, frameMat);
+                        addPlanBox(openingGroup, openingX + (horizontal ? 4 : -1), openingY + (horizontal ? -1 : 4), horizontal ? openingW - 8 : 6, horizontal ? 6 : openingD - 8, 0.44 + opening.bottom, opening.height - 0.08, opening.bottom === 0 ? doorMat : glassMat);
+                    }
+                    cursor = opening.start + opening.span;
+                });
+                addSegment(cursor, length - cursor, 0, h);
+            }
+
+            const door = start => ({ start, span: 80, bottom: 0, height: 2.1 });
+            const windowOpening = (start, span, bottom = 0.9, height = 1.4) => ({ start, span, bottom, height });
+            addPlanWall(plan.margin, plan.margin, plan.width - plan.margin * 2, plan.outerWall, [
+                windowOpening(leftWallX + 50 - plan.margin, 140),
+                windowOpening(inX + inW - 190 - plan.margin, 140)
+            ], true);
+            addPlanWall(plan.margin, plan.depth - inX, plan.width - plan.margin * 2, plan.outerWall, [
+                { start: plan.leftBlockW / 2 - 50, span: 100, bottom: 0, height: 2.1 },
+                windowOpening(leftWallX + 150 - plan.margin, 180),
+                windowOpening(inX + inW - 190 - plan.margin, 140)
+            ], true);
+            addPlanWall(plan.margin, inY, plan.outerWall, inH, [windowOpening(60, 60, 1.6, 0.6), windowOpening(240, 80, 1.2, 1)], true);
+            addPlanWall(plan.width - inX, inY, plan.outerWall, inH);
+            addPlanWall(leftWallX, inY, plan.partition, inH, [{ start: 400, span: 90, bottom: 0, height: 2.1 }]);
+            addPlanWall(inX, inY + plan.bathroomEnd, plan.leftBlockW, plan.partition, [door(plan.leftBlockW / 2)]);
+            addPlanWall(inX, inY + plan.utilityEnd, plan.leftBlockW, plan.partition, [door(plan.leftBlockW / 2)]);
+            addPlanWall(rightWallX, inY, plan.bearingWall, inH, [
+                { start: 200, span: 90, bottom: 0, height: 2.1 },
+                { start: 400, span: 90, bottom: 0, height: 2.1 }
+            ]);
+            addPlanWall(rightRoomX, inY + plan.bedroomEnd, plan.rightBlockW, plan.partition);
+
+            const livingX = leftWallX + plan.partition;
+            const rooms = [
+                { name: 'Санузел', area: '4.3 м²', x: inX, y: inY, width: plan.leftBlockW, depth: plan.bathroomEnd, color: 0xd9e9ed },
+                { name: 'Техпомещение', area: '3.2 м²', x: inX, y: inY + plan.bathroomEnd + plan.partition, width: plan.leftBlockW, depth: plan.utilityEnd - plan.bathroomEnd - plan.partition, color: 0xe2e8f0 },
+                { name: 'Тамбур', area: '4.0 м²', x: inX, y: inY + plan.utilityEnd + plan.partition, width: plan.leftBlockW, depth: inH - plan.utilityEnd - plan.partition, color: 0xe8dfd1 },
+                { name: 'Кухня-гостиная', area: '19.3 м²', x: livingX, y: inY, width: rightWallX - livingX, depth: inH, color: 0xdce9df },
+                { name: 'Мастер-спальня', area: '11.5 м²', x: rightRoomX, y: inY, width: plan.rightBlockW, depth: plan.bedroomEnd, color: 0xeadfd5 },
+                { name: 'Детская', area: '9.2 м²', x: rightRoomX, y: inY + plan.bedroomEnd + plan.partition, width: plan.rightBlockW, depth: inH - plan.bedroomEnd - plan.partition, color: 0xe7e3d3 }
+            ];
+            rooms.forEach(room => {
+                addPlanBox(houseGroup, room.x, room.y, room.width, room.depth, 0.4, 0.025, new THREE.MeshStandardMaterial({ color: room.color, roughness: 1 }));
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 160;
+                const context = canvas.getContext('2d');
+                context.fillStyle = 'rgba(255, 255, 255, 0.94)';
+                context.fillRect(0, 0, canvas.width, canvas.height);
+                context.textAlign = 'center';
+                context.fillStyle = '#1e293b';
+                context.font = '600 60px sans-serif';
+                context.fillText(room.name, 256, 65, 480);
+                context.fillStyle = '#475569';
+                context.font = '46px sans-serif';
+                context.fillText(room.area, 256, 116);
+                const labelTexture = new THREE.CanvasTexture(canvas);
+                labelTexture.encoding = THREE.sRGBEncoding;
+                const label = new THREE.Sprite(new THREE.SpriteMaterial({ map: labelTexture, depthTest: false, toneMapped: false }));
+                label.position.set((room.y + room.depth / 2 - plan.depth / 2) * scaleX, 1.35, (room.x + room.width / 2 - plan.width / 2) * scaleZ);
+                const labelWidth = Math.min(2.5, room.depth * scaleX * 0.93);
+                label.scale.set(labelWidth, labelWidth * canvas.height / canvas.width, 1);
+                label.renderOrder = 1;
+                labelGroup.add(label);
+            });
+
+            // 3. Roof
+            const roofShape = new THREE.Shape();
+            const roofOverhang = 0.6;
+            const roofW = w / 2 + roofOverhang;
+            const roofHeight = 1.6;
+            
+            roofShape.moveTo(-roofW, 0);
+            roofShape.lineTo(0, roofHeight);
+            roofShape.lineTo(roofW, 0);
+            roofShape.lineTo(-roofW, 0);
+
+            const extrudeSettings = { depth: l + (roofOverhang * 2), bevelEnabled: false };
+            const roofGeo = new THREE.ExtrudeGeometry(roofShape, extrudeSettings);
+            const roof = new THREE.Mesh(roofGeo, roofMat);
+            
+            roof.position.set(0, 0.4 + h, - (l / 2 + roofOverhang));
+            roof.castShadow = true;
+            roof.receiveShadow = true;
+            houseGroup.add(roof);
+
+            let viewMode = 'exterior';
+            const viewButtons = ['exterior', 'interior', 'top'].map(mode => document.getElementById('house-' + mode));
+            function setHouseView(mode) {
+                if (mode === viewMode) return;
+                if (viewMode === 'exterior') controls.saveState();
+                const cutaway = mode !== 'exterior';
+                roof.visible = !cutaway;
+                openingGroup.visible = !cutaway;
+                wallGroup.scale.y = cutaway ? 0.28 : 1;
+                labelGroup.visible = cutaway;
+                controls.enableDamping = false;
+                controls.update();
+                if (!cutaway) {
+                    controls.reset();
+                } else {
+                    controls.target.set(0, 0.5, 0);
+                    const distance = Math.max(l, w / camera.aspect) * 1.55;
+                    if (mode === 'top') camera.position.set(0, distance, 0.001);
+                    else camera.position.set(distance * 0.5, distance * 0.8, distance * 0.6);
+                    controls.update();
+                }
+                controls.enableDamping = true;
+                viewMode = mode;
+                viewButtons.forEach(button => button.setAttribute('aria-pressed', String(button.id === 'house-' + mode)));
+                const descriptions = {
+                    exterior: 'Внешний вид: крыша и стены показаны полностью.',
+                    interior: 'Планировка по чертежу: крыша скрыта, стены показаны в разрезе. Вращайте модель, чтобы рассмотреть все шесть помещений.',
+                    top: 'Вид сверху: расположение комнат и дверных проёмов по чертежу. Модель можно вращать и приближать.'
+                };
+                document.getElementById('house-view-status').textContent = descriptions[mode];
+                renderer.domElement.setAttribute('aria-label', descriptions[mode]);
+            }
+            viewButtons.forEach(button => {
+                button.disabled = false;
+                button.addEventListener('click', () => setHouseView(button.id.replace('house-', '')));
+            });
+
+            // Ground Environment
+            const groundGeo = new THREE.PlaneGeometry(50, 50);
+            const groundMat = new THREE.MeshStandardMaterial({ color: 0xe2e8f0, roughness: 1 });
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            const grid = new THREE.GridHelper(50, 50, 0xcbd5e1, 0xf1f5f9);
+            grid.position.y = 0.01;
+            scene.add(grid);
+
+            scene.add(houseGroup);
+            camera.lookAt(0, 1.5, 0);
+
+            loader.style.opacity = '0';
+            setTimeout(() => loader.style.display = 'none', 500);
+
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update();
+                renderer.render(scene, camera);
+            }
+            animate();
+
+            const resizeObserver = new ResizeObserver(() => {
+                if (container.clientWidth > 0) {
+                    camera.aspect = container.clientWidth / container.clientHeight;
+                    camera.updateProjectionMatrix();
+                    renderer.setSize(container.clientWidth, container.clientHeight);
+                }
+            });
+            resizeObserver.observe(container);
+        }
+
+        function drawFloorPlan() {
+            const canvas = document.getElementById('floorPlanCanvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            
+            const scale = 1; 
+            const w = housePlan.width * scale;
+            const h = housePlan.depth * scale;
+            
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            const outerWall = housePlan.outerWall;
+            const partition = housePlan.partition;
+
+            function drawRect(x, y, width, height, fill, stroke, lineWidth=1) {
+                ctx.fillStyle = fill;
+                ctx.fillRect(x, y, width, height);
+                ctx.strokeStyle = stroke;
+                ctx.lineWidth = lineWidth;
+                ctx.strokeRect(x, y, width, height);
+            }
+
+            drawRect(10, 10, w - 20, h - 20, '#cbd5e1', '#475569', 2);
+            ctx.clearRect(10 + outerWall, 10 + outerWall, w - 20 - outerWall*2, h - 20 - outerWall*2);
+
+            const inX = 10 + outerWall;
+            const inY = 10 + outerWall;
+            const inW = w - 20 - outerWall*2;
+            const inH = h - 20 - outerWall*2;
+
+            const leftBlockW = housePlan.leftBlockW;
+            const rightBlockW = housePlan.rightBlockW;
+            
+            drawRect(inX + leftBlockW, inY, partition, inH, '#cbd5e1', '#475569');
+            drawRect(inX, inY + housePlan.bathroomEnd, leftBlockW, partition, '#cbd5e1', '#475569');
+            drawRect(inX, inY + housePlan.utilityEnd, leftBlockW, partition, '#cbd5e1', '#475569');
+            drawRect(inX + inW - rightBlockW - housePlan.bearingWall, inY, housePlan.bearingWall, inH, '#94a3b8', '#334155');
+            drawRect(inX + inW - rightBlockW, inY + housePlan.bedroomEnd, rightBlockW, partition, '#cbd5e1', '#475569');
+
+            function drawWindow(x, y, width, height, isVertical=false) {
+                ctx.fillStyle = '#bae6fd';
+                ctx.fillRect(x, y, width, height);
+                ctx.strokeStyle = '#0284c7';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(x, y, width, height);
+                ctx.beginPath();
+                if (isVertical) {
+                    ctx.moveTo(x + width/2, y);
+                    ctx.lineTo(x + width/2, y + height);
+                } else {
+                    ctx.moveTo(x, y + height/2);
+                    ctx.lineTo(x + width, y + height/2);
+                }
+                ctx.stroke();
+            }
+
+            drawWindow(10, inY + 240, outerWall, 80, true);
+            drawWindow(10, inY + 60, outerWall, 60, true);
+            drawWindow(inX + inW - 140 - 50, 10, 140, outerWall);
+            drawWindow(inX + inW - 140 - 50, h - 10 - outerWall, 140, outerWall);
+            drawWindow(inX + leftBlockW + 50, 10, 140, outerWall);
+            drawWindow(inX + leftBlockW + 150, h - 10 - outerWall, 180, outerWall);
+
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(10 + leftBlockW/2 - 50, h - 10 - outerWall - 2, 100, outerWall + 4);
+            ctx.strokeStyle = '#ea580c';
+            ctx.lineWidth = 3;
+            ctx.beginPath();
+            ctx.moveTo(10 + leftBlockW/2 - 50, h - 10);
+            ctx.lineTo(10 + leftBlockW/2 + 50, h - 10);
+            ctx.stroke();
+
+            ctx.clearRect(inX + leftBlockW - 2, inY + 400, partition + 4, 90);
+            ctx.clearRect(inX + leftBlockW/2, inY + 200 - 2, 80, partition + 4);
+            ctx.clearRect(inX + leftBlockW/2, inY + 350 - 2, 80, partition + 4);
+            ctx.clearRect(inX + inW - rightBlockW - 22, inY + 200, 24, 90);
+            ctx.clearRect(inX + inW - rightBlockW - 22, inY + 400, 24, 90);
+
+            function drawLabel(text, x, y, area) {
+                ctx.font = 'bold 16px Inter, sans-serif';
+                ctx.fillStyle = '#1e293b';
+                ctx.textAlign = 'center';
+                ctx.fillText(text, x, y);
+                ctx.font = '14px Inter, sans-serif';
+                ctx.fillStyle = '#64748b';
+                ctx.fillText(area, x, y + 20);
+            }
+
+            drawLabel('Санузел', inX + leftBlockW/2, inY + 100, '4.3 м²');
+            drawLabel('Тех.помещение', inX + leftBlockW/2, inY + 280, '3.2 м²');
+            drawLabel('Тамбур', inX + leftBlockW/2, inY + 440, '4.0 м²');
+            drawLabel('Кухня - Гостиная', inX + leftBlockW + (inW - leftBlockW - rightBlockW)/2, inY + 250, '19.3 м²');
+            drawLabel('Мастер-спальня', inX + inW - rightBlockW/2, inY + 140, '11.5 м²');
+            drawLabel('Детская', inX + inW - rightBlockW/2, inY + 410, '9.2 м²');
+
+            ctx.strokeStyle = 'rgba(220, 38, 38, 0.4)';
+            ctx.setLineDash([5, 5]);
+            ctx.lineWidth = 1;
+            
+            ctx.beginPath(); ctx.moveTo(0, h - 10 - outerWall/2); ctx.lineTo(w, h - 10 - outerWall/2); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, inY + 300); ctx.lineTo(w, inY + 300); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(0, 10 + outerWall/2); ctx.lineTo(w, 10 + outerWall/2); ctx.stroke();
+            
+            ctx.setLineDash([]);
+            ctx.fillStyle = '#0f172a';
+            ctx.font = '14px sans-serif';
+            ctx.textAlign = 'center';
+            ctx.fillText('11250', w/2, h + 15);
+        }
+
+        function downloadPlan() {
+            const msgBox = document.createElement('div');
+            msgBox.className = 'fixed bottom-5 right-5 bg-slate-900 text-white px-6 py-4 rounded-xl shadow-2xl z-50 flex items-center gap-3 animate-bounce';
+            msgBox.innerHTML = '<i class="fa-solid fa-circle-check text-green-400"></i> Чертеж готов к сохранению в PDF.';
+            document.body.appendChild(msgBox);
+            setTimeout(() => msgBox.remove(), 4000);
+        }
+
+        window.onload = function() {
+            drawFloorPlan();
+            window.addEventListener('resize', () => {
+                if(document.getElementById('tab-arch').classList.contains('active')){
+                    drawFloorPlan();
+                }
+            });
+        };
+    </script>
+</body>
+</html>
